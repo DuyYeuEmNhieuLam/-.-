@@ -1,17 +1,3 @@
---[[
-	LiquidGlass UI Library  (Roblox / Luau)
-	Phong cách kính mờ: sidebar + tìm kiếm, tab dạng pill, toggle, slider,
-	dropdown trượt từ cạnh phải, đổi theme trực tiếp, nút nổi, thông báo.
-
-	Dùng như ModuleScript:   local Library = require(path.to.LiquidGlass)
-
-	Một file duy nhất (loadstring hoặc require đều được): lõi + Section, Label, Button, Toggle, Slider,
-	Dropdown, Input, Paragraph, Cards (Discord/YouTube/TikTok), Music engine + AddMusicPlayer.
-	Tab dựng sẵn (gọi khi cần): Window:AddSettingsTab / AddMusicTab / AddInfoTab
-
-	Text chạy theo code: Title / Description / Content / Name / Stat có thể là
-	string HOẶC function trả về string (tự cập nhật), hoặc bảng gồm nhiều dòng.
-]]
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -25,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Library = {}
 Library.__index = Library
 Library.Version = "1.2.0"
-Library.AnimationSpeed = 1 -- nhân tốc độ mọi animation (0.5 = chậm, 2 = nhanh)
+Library.AnimationSpeed = 1
 
 local Window = {}
 Window.__index = Window
@@ -37,10 +23,6 @@ local FONT_MED = Enum.Font.GothamMedium
 local FONT_BOLD = Enum.Font.GothamBold
 local LEFT, RIGHT, CENTER = Enum.TextXAlignment.Left, Enum.TextXAlignment.Right, Enum.TextXAlignment.Center
 
-------------------------------------------------------------------------
--- Themes
--- Key kết thúc bằng "T" là độ trong suốt (Transparency)
-------------------------------------------------------------------------
 local C = Color3.fromRGB
 
 local function derive(base, over)
@@ -74,8 +56,6 @@ local LIGHT_GLASS = {
 	RimT = 0.55,
 }
 
--- Kính kiểu iOS 26: rất trong, blur mạnh, viền sáng kép, bo góc lớn
--- R = hệ số bo góc, RimT = độ trong của viền sáng bên trong, Frost = độ nhòe chiều sâu (DepthOfField)
 local Themes = {
 	["iOS 26 Glass Dark"] = {
 		Window = C(30, 32, 44), WindowT = 0.55,
@@ -164,7 +144,6 @@ function Library:AddTheme(name, theme, base)
 	table.insert(ThemeOrder, name)
 end
 
--- Âm thanh UI mặc định (có thể thay bằng rbxassetid:// của bạn qua opts.Sounds)
 Library.Sounds = {
 	Click = "rbxasset://sounds/button.wav",
 	Toggle = "rbxasset://sounds/switch.wav",
@@ -174,9 +153,6 @@ Library.Sounds = {
 	Notify = "rbxasset://sounds/electronicpingshort.wav",
 }
 
-------------------------------------------------------------------------
--- Helpers
-------------------------------------------------------------------------
 local function tween(inst, props, t, style, dir)
 	local tw = TweenService:Create(
 		inst,
@@ -224,7 +200,6 @@ local function isMove(input)
 		or input.UserInputType == Enum.UserInputType.Touch
 end
 
--- Signal nhỏ: Connect / Fire
 local function newSignal()
 	local handlers = {}
 	local sig = {}
@@ -253,7 +228,6 @@ local function newSignal()
 	return sig
 end
 
--- Giá trị "động" = function, hoặc bảng có chứa function
 local function isDynamic(v)
 	local t = type(v)
 	if t == "function" then
@@ -269,7 +243,6 @@ local function isDynamic(v)
 	return false
 end
 
--- Kéo theo trục X (dùng cho slider)
 local function dragX(hit, onMove, onState)
 	hit.InputBegan:Connect(function(input)
 		if not isPress(input) then
@@ -297,10 +270,6 @@ local function dragX(hit, onMove, onState)
 	end)
 end
 
-------------------------------------------------------------------------
--- Window: text chạy theo code + flags + signal
-------------------------------------------------------------------------
--- Biến string | number | function | bảng-nhiều-dòng thành string. Trả về (text, ok)
 function Window:_resolve(v, depth)
 	depth = depth or 0
 	local t = type(v)
@@ -329,8 +298,6 @@ function Window:_resolve(v, depth)
 	return tostring(v), true
 end
 
--- Gắn text cho TextLabel/TextBox. Nếu value là function (hoặc bảng có function)
--- thì tự cập nhật mỗi `rate` giây (mặc định opts.LiveRate = 0.25s).
 function Window:_text(inst, value, rate, onChange)
 	local win = self
 	local b = { inst = inst, rate = rate, acc = 0, registered = false }
@@ -371,7 +338,6 @@ function Window:_text(inst, value, rate, onChange)
 	return b
 end
 
--- Auto save: lưu Flag + theme ra file (cần executor có writefile/readfile/isfile)
 local HttpService = game:GetService("HttpService")
 local CONFIG_FILE = "ThanhDuyHub_Config.json"
 local FS_OK = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
@@ -420,7 +386,6 @@ function Window:_scheduleSave()
 	end)
 end
 
--- Flag: lưu giá trị + phát tín hiệu Changed (trừ khi silent)
 function Window:_emit(flag, value, silent)
 	if flag == nil then
 		return
@@ -450,7 +415,6 @@ function Window:GetFlag(flag)
 	return self.Flags[flag]
 end
 
--- Điều khiển một thành phần bằng code: Window:SetFlag("feature", true)
 function Window:SetFlag(flag, value, silent)
 	local c = self._controls[flag]
 	if c and c.Set then
@@ -460,7 +424,6 @@ function Window:SetFlag(flag, value, silent)
 	return false
 end
 
--- Lắng nghe một flag: Window:Listen("feature", function(value) ... end)
 function Window:Listen(flag, fn)
 	return self.Changed:Connect(function(f, v)
 		if f == flag then
@@ -469,14 +432,10 @@ function Window:Listen(flag, fn)
 	end)
 end
 
--- Việc cần dọn khi Window:Destroy()
 function Window:OnDestroy(fn)
 	table.insert(self._destroyHooks, fn)
 end
 
-------------------------------------------------------------------------
--- Window: theme / binding
-------------------------------------------------------------------------
 function Window:_val(key)
 	local v = self.Theme[key]
 	if v == nil then
@@ -499,7 +458,6 @@ function Window:_hook(fn)
 	fn(true)
 end
 
--- Bán kính thật = bán kính gốc x hệ số R của theme (iOS 26 bo tròn hơn)
 function Window:_cr(radius)
 	return self.Rounded and radius * (self.Theme.R or 1) or 0
 end
@@ -521,7 +479,6 @@ function Window:_stroke(inst, thickness)
 	})
 	self:_bind(s, "Color", "Stroke")
 	self:_bind(s, "Transparency", "StrokeT")
-	-- viền sáng kiểu kính: sáng ở góc trên-trái và dưới-phải, mờ ở giữa
 	new("UIGradient", {
 		Rotation = 45,
 		Transparency = NumberSequence.new({
@@ -557,7 +514,7 @@ function Window:_applyTheme()
 end
 
 function Window:_sound(name, speed)
-	do return end -- UI sound đã tắt
+	do return end
 	if not self.SoundEnabled then
 		return
 	end
@@ -616,7 +573,6 @@ function Window:SetRounded(on)
 end
 
 function Window:SetBlur(on, size)
-	-- Blur đã được tắt hoàn toàn: luôn giữ giao diện rõ, không làm mờ nền
 	self.BlurEnabled = false
 	if self._blur then
 		self._blur:Destroy()
@@ -644,9 +600,6 @@ function Window:SetFloatingButton(on)
 	self._float.Visible = self.FloatingEnabled
 end
 
-------------------------------------------------------------------------
--- Window: vẽ icon nhỏ bằng Frame (không phụ thuộc asset)
-------------------------------------------------------------------------
 function Window:_bar(parent, size, pos, rot, key)
 	local f = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -701,9 +654,6 @@ function Window:_searchIcon(parent)
 	self:_bar(c, UDim2.fromOffset(5, 2), UDim2.fromOffset(11, 11), 45)
 end
 
-------------------------------------------------------------------------
--- Window: kéo thả
-------------------------------------------------------------------------
 function Window:_drag(handle, target, onTap, onState)
 	handle.InputBegan:Connect(function(input)
 		if not isPress(input) then
@@ -745,10 +695,6 @@ function Window:_drag(handle, target, onTap, onState)
 	end)
 end
 
-------------------------------------------------------------------------
--- Library:CreateWindow
-------------------------------------------------------------------------
--- Chọn nơi đặt GUI: gethui() / CoreGui (executor) nếu có quyền, không thì PlayerGui
 local function guiParent()
 	local ok, h = pcall(function()
 		return gethui and gethui()
@@ -907,7 +853,6 @@ function Window:_intro()
 	})
 
 	task.spawn(function()
-		-- hiện dần: avatar nảy lên, chữ trượt vào, viền và glow thở
 		tween(scale, { Scale = 1 }, 0.9, Enum.EasingStyle.Back)
 		tween(title, { TextTransparency = 0 }, 0.6)
 		tween(status, { TextTransparency = 0 }, 0.6)
@@ -932,7 +877,6 @@ function Window:_intro()
 		pct.Text = "100%"
 		task.wait(0.3)
 
-		-- thoát: mờ dần và phóng nhẹ
 		tween(overlay, { BackgroundTransparency = 1 }, 0.6)
 		tween(glow, { BackgroundTransparency = 1 }, 0.5)
 		tween(ringStroke, { Transparency = 1 }, 0.5)
@@ -971,7 +915,6 @@ function Library:CreateWindow(opts)
 	self._autoSave = opts.AutoSave ~= false
 	self._saved = self._autoSave and self:_readConfig() or {}
 
-	-- Tween lặp vô hạn (idle animation)
 	local function loop(inst, props, t, style, reverse)
 		local tw = TweenService:Create(
 			inst,
@@ -998,7 +941,6 @@ function Library:CreateWindow(opts)
 		Parent = parent,
 	})
 
-	-- Âm thanh UI
 	self.SoundEnabled = false
 	self.SoundVolume = opts.SoundVolume or 0.6
 	self._sounds, self._lastSound = {}, {}
@@ -1019,7 +961,6 @@ function Library:CreateWindow(opts)
 		end
 	end
 
-	-- Nền (background) phía sau cửa sổ kính: opts.Background, opts.BackgroundDim
 	self._bg = new("ImageLabel", {
 		Name = "Background",
 		Size = UDim2.fromScale(1, 1),
@@ -1039,7 +980,6 @@ function Library:CreateWindow(opts)
 	})
 	self:SetBackground(opts.Background, opts.BackgroundDim)
 
-	-- Cửa sổ chính
 	local main = new("Frame", {
 		Name = "Main",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1050,6 +990,7 @@ function Library:CreateWindow(opts)
 	self.Main = main
 	self._uiScale = new("UIScale", { Scale = 0.8, Parent = main })
 	tween(self._uiScale, { Scale = 1 }, 0.8, Enum.EasingStyle.Elastic)
+	self:_flash()
 	task.delay(0.35, function()
 		self:_flash()
 	end)
@@ -1062,7 +1003,6 @@ function Library:CreateWindow(opts)
 		sheen.Transparency = NumberSequence.new(0, self.Theme.Sheen)
 	end)
 
-	-- Lớp "chất lỏng": quả cầu sáng trôi chậm, vệt sáng quét ngang, ánh sáng cạnh trên
 	local liquid = new("CanvasGroup", {
 		Name = "Liquid",
 		Size = UDim2.fromScale(1, 1),
@@ -1090,11 +1030,9 @@ function Library:CreateWindow(opts)
 			new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = c })
 			self:_bind(c, "BackgroundColor3", key)
 		end
-		-- khối tròn trôi qua lại + phồng xẹp nhẹ
 		loop(holder, { Position = to, Size = UDim2.fromOffset(size * 1.18, size * 1.18) }, t, Enum.EasingStyle.Sine, true)
 	end
 
-	-- Viền kính thứ hai bên trong (hiệu ứng viền kép của iOS 26), xoay ngược chiều viền ngoài
 	local rim = new("Frame", {
 		Size = UDim2.new(1, -6, 1, -6),
 		Position = UDim2.fromOffset(3, 3),
@@ -1120,7 +1058,6 @@ function Library:CreateWindow(opts)
 	})
 	loop(rimGrad, { Rotation = -135 }, 16, Enum.EasingStyle.Linear, false)
 
-	-- Thanh tiêu đề
 	local titlebar = new("Frame", {
 		Name = "Titlebar",
 		Size = UDim2.new(1, 0, 0, 36),
@@ -1162,7 +1099,6 @@ function Library:CreateWindow(opts)
 		tween(self._uiScale, { Scale = self.Scale * (active and 1.025 or 1) }, 0.3, Enum.EasingStyle.Back)
 	end)
 
-	-- Nút điều khiển
 	local ctl = new("Frame", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -10, 0.5, 0),
@@ -1244,7 +1180,6 @@ function Library:CreateWindow(opts)
 		end
 	end, true)
 
-	-- Thân cửa sổ
 	local body = new("CanvasGroup", {
 		Name = "Body",
 		Position = UDim2.fromOffset(0, 36),
@@ -1255,7 +1190,6 @@ function Library:CreateWindow(opts)
 	})
 	self.Body = body
 
-	-- Sidebar
 	local side = new("Frame", {
 		Position = UDim2.fromOffset(-14, 4),
 		Size = UDim2.new(0, 150, 1, -14),
@@ -1263,7 +1197,6 @@ function Library:CreateWindow(opts)
 		Parent = body,
 	})
 
-	-- Logo lớn phía trên ô tìm kiếm
 	local logoBlock = new("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundTransparency = 1, Parent = side })
 	local glow = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1305,7 +1238,6 @@ function Library:CreateWindow(opts)
 			letter.TextColor3 = lum > 0.75 and Color3.fromRGB(20, 20, 24) or Color3.new(1, 1, 1)
 		end
 	end)
-	-- logo tương tác: rê chuột thì phóng to, bấm thì xoay một vòng
 	local badgeScale = new("UIScale", { Parent = badge })
 	local badgeBtn = new("TextButton", {
 		Size = UDim2.fromScale(1, 1),
@@ -1333,7 +1265,6 @@ function Library:CreateWindow(opts)
 			spinning = false
 		end)
 	end)
-	-- viền sáng quét quanh logo
 	local ring = new("UIStroke", {
 		Thickness = 2,
 		Color = Color3.new(1, 1, 1),
@@ -1349,7 +1280,6 @@ function Library:CreateWindow(opts)
 		Parent = ring,
 	})
 	loop(ringGrad, { Rotation = 360 }, 3.5, Enum.EasingStyle.Linear, false)
-	-- logo nhấp nhô nhẹ + glow thở
 	loop(badge, { Position = UDim2.new(0.5, 0, 0, 38) }, 2.2, Enum.EasingStyle.Sine, true)
 	loop(glow, {
 		Position = UDim2.new(0.5, 0, 0, 38),
@@ -1406,7 +1336,6 @@ function Library:CreateWindow(opts)
 		CanvasSize = UDim2.new(),
 		Parent = side,
 	})
-	-- thanh pill trượt giữa các tab
 	local pill = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 32),
 		Visible = false,
@@ -1434,7 +1363,6 @@ function Library:CreateWindow(opts)
 	})
 	new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = self._tabList })
 
-	-- Khu nội dung
 	local content = new("Frame", {
 		Position = UDim2.fromOffset(198, 0),
 		Size = UDim2.new(1, -182, 1, -8),
@@ -1459,7 +1387,6 @@ function Library:CreateWindow(opts)
 		Parent = content,
 	})
 
-	-- Panel dropdown trượt từ cạnh phải
 	self._blocker = new("TextButton", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
@@ -1496,7 +1423,6 @@ function Library:CreateWindow(opts)
 	new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2), Parent = plist })
 	self._panel, self._plist = panel, plist
 
-	-- Nút mở UI: kính tròn, icon game ở giữa, viền accent phát sáng nhịp nhàng
 	local float = new("ImageButton", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -24, 0.4, 0),
@@ -1558,14 +1484,12 @@ function Library:CreateWindow(opts)
 	end)
 	loop(ring, { Thickness = 3.5 }, 1.6, Enum.EasingStyle.Sine, true)
 
-	-- Phím tắt ẩn/hiện
 	self._keyConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == self.ToggleKey then
 			self:Toggle()
 		end
 	end)
 
-	-- Animation mở cửa sổ: nền mờ dần, sidebar và nội dung trượt vào
 	local wt = self:_val("WindowT")
 	main.BackgroundTransparency = 1
 	tween(main, { BackgroundTransparency = wt }, 0.45)
@@ -1575,7 +1499,6 @@ function Library:CreateWindow(opts)
 		tween(content, { Position = UDim2.fromOffset(172, 0) }, 0.65, Enum.EasingStyle.Quint)
 	end)
 
-	-- Vòng cập nhật text động (function) của các thành phần
 	local liveRate = opts.LiveRate or 0.25
 	table.insert(self._conns, RunService.Heartbeat:Connect(function(dt)
 		if not self.Visible then
@@ -1596,7 +1519,6 @@ function Library:CreateWindow(opts)
 		end
 	end))
 
-	-- khôi phục theme đã lưu
 	if self._saved.__Theme and Themes[self._saved.__Theme] then
 		self:SetTheme(self._saved.__Theme)
 	end
@@ -1606,10 +1528,6 @@ function Library:CreateWindow(opts)
 	return self
 end
 
-------------------------------------------------------------------------
--- Window: điều khiển
-------------------------------------------------------------------------
--- Hiệu ứng sáng khi mở UI: lớp sáng quét ngang qua cửa sổ + viền sáng loé lên
 function Window:_flash()
 	if not self.Main or not self.Main.Parent then
 		return
@@ -1648,6 +1566,27 @@ function Window:_flash()
 	end)
 end
 
+function Window:_flash()
+	if not self.Main then
+		return
+	end
+	local glow = new("Frame", {
+		Name = "Flash",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C(255, 255, 255),
+		BackgroundTransparency = 0.4,
+		ZIndex = 50,
+		Parent = self.Main,
+	})
+	new("UICorner", { CornerRadius = UDim.new(0, 24 * (self.Theme.R or 1)), Parent = glow })
+	tween(glow, { BackgroundTransparency = 1 }, 0.9)
+	task.delay(1, function()
+		if glow.Parent then
+			glow:Destroy()
+		end
+	end)
+end
+
 function Window:Toggle(v)
 	if v == nil then
 		v = not self.Visible
@@ -1658,6 +1597,7 @@ function Window:Toggle(v)
 		self.Main.Visible = true
 		self._uiScale.Scale = self.Scale * 0.92
 		tween(self._uiScale, { Scale = self.Scale }, 0.25, Enum.EasingStyle.Back)
+		self:_flash()
 		self:_flash()
 	else
 		self:_closePanel()
@@ -1735,11 +1675,6 @@ function Window:Destroy()
 	self.Gui:Destroy()
 end
 
--- Nền:
---   ảnh tĩnh: "rbxassetid://..." / số / URL
---   ảnh động (GIF đã đổi thành spritesheet):
---     { Sheet = id, Columns = 4, Rows = 7, FrameWidth = 256, FrameHeight = 144, Frames = 28, FPS = 12 }
--- dim = độ tối lớp phủ (0 - 1)
 function Window:SetBackground(src, dim)
 	self._bgToken = (self._bgToken or 0) + 1
 	local token = self._bgToken
@@ -1781,11 +1716,10 @@ function Window:SetBackground(src, dim)
 		bg.ImageRectOffset = Vector2.new(0, 0)
 	end
 
-	local dimAmount = math.clamp(tonumber(dim) or 0.35, 0, 1)
+	local dimAmount = math.clamp(tonumber(dim) or 0, 0, 1)
 	tween(self._bgDim, { BackgroundTransparency = bg.Image ~= "" and (1 - dimAmount) or 1 }, 0.4)
 end
 
--- Hộp xác nhận trước khi xoá UI (nút X). onConfirm chạy trước khi đóng.
 function Window:AskClose(onConfirm)
 	if self._askOpen or self._closing then
 		return
@@ -1932,7 +1866,6 @@ function Window:AskClose(onConfirm)
 	end)
 end
 
--- Đóng có animation (nút X dùng hàm này); Destroy() vẫn đóng ngay lập tức
 function Window:Close()
 	if self._closing then
 		return
@@ -1951,9 +1884,6 @@ function Window:Close()
 	end)
 end
 
-------------------------------------------------------------------------
--- Window: panel dropdown
-------------------------------------------------------------------------
 function Window:_closePanel()
 	if not self._panelOpen then
 		return
@@ -1975,7 +1905,6 @@ end
 
 function Window:_openPanel(cfg)
 	self:_sound("Open")
-	-- panel của dropdown khác đang mở: báo nó đóng trước
 	local prevClose = self._panelOnClose
 	self._panelOnClose = cfg.OnClose
 	if prevClose then
@@ -2088,9 +2017,6 @@ function Window:_openPanel(cfg)
 	tween(self._panelScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
 end
 
-------------------------------------------------------------------------
--- Window: thông báo
-------------------------------------------------------------------------
 function Window:Notify(o)
 	if not self._notifyHolder then
 		self._notifyHolder = new("Frame", {
@@ -2185,9 +2111,6 @@ function Window:Notify(o)
 	end)
 end
 
-------------------------------------------------------------------------
--- Window: tab
-------------------------------------------------------------------------
 function Window:_applySearch()
 	local q = string.lower(self._search.Text or "")
 	local tab = self.ActiveTab
@@ -2223,7 +2146,6 @@ function Window:SelectTab(tab)
 		t._render(false)
 	end
 
-	-- pill trượt tới tab được chọn
 	local idx = table.find(self.Tabs, tab) or 1
 	local prevIdx = prev and table.find(self.Tabs, prev) or idx
 	local target = UDim2.fromOffset(0, (idx - 1) * 36)
@@ -2238,17 +2160,14 @@ function Window:SelectTab(tab)
 		if prev then
 			self:_sound("Tab")
 		end
-		-- trang mới mờ dần + trượt lên
 		tab.Group.Visible = true
 		tab.Group.GroupTransparency = 1
 		tab.Group.Position = UDim2.fromOffset(0, idx < prevIdx and -26 or 26)
 		tween(tab.Group, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.55, Enum.EasingStyle.Back)
-		-- tiêu đề trượt vào
 		self._header.Text = tab.Title
 		self._header.TextTransparency = 1
 		self._header.Position = UDim2.fromOffset(4, 12)
 		tween(self._header, { TextTransparency = 0, Position = UDim2.fromOffset(4, 0) }, 0.4)
-		-- chữ hiện dần như gõ
 		task.spawn(function()
 			local n = utf8.len(tab.Title) or #tab.Title
 			for i = 0, n do
@@ -2260,13 +2179,11 @@ function Window:SelectTab(tab)
 			end
 			self._header.MaxVisibleGraphemes = -1
 		end)
-		-- các hàng bật lên lần lượt
 		for k, e in ipairs(tab.Elements) do
 			if e.Scale then
 				e.Scale.Scale = 0.86
 				task.delay(math.min(k, 12) * 0.04, function()
 					tween(e.Scale, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
-					-- sóng sáng chạy qua từng hàng
 					if e.Flash then
 						e.Flash.BackgroundTransparency = 0.82
 						tween(e.Flash, { BackgroundTransparency = 1 }, 0.7)
@@ -2279,7 +2196,6 @@ function Window:SelectTab(tab)
 				end)
 			end
 		end
-		-- icon nảy
 		tab._iconHolder.Size = UDim2.fromOffset(8, 8)
 		tween(tab._iconHolder, { Size = UDim2.fromOffset(16, 16) }, 0.45, Enum.EasingStyle.Back)
 	end
@@ -2353,7 +2269,6 @@ function Window:AddTab(o)
 	end
 	self:_hook(tab._render)
 
-	-- tab hiện ra lần lượt: chữ trượt vào, icon nảy lên
 	lbl.TextTransparency = 1
 	lbl.Position = UDim2.fromOffset(70, 0)
 	local iconPop = new("UIScale", { Scale = 0, Parent = iconHolder })
@@ -2403,9 +2318,6 @@ function Window:AddTab(o)
 	return tab
 end
 
-------------------------------------------------------------------------
--- Tab: các thành phần
-------------------------------------------------------------------------
 function Tab:_row(o, cfg)
 	cfg = cfg or {}
 	local win = self.Window
@@ -2524,7 +2436,6 @@ function Tab:_row(o, cfg)
 	local entry = { Frame = row, Scale = rowScale, Flash = flashRef, Stroke = rowStroke, Labels = { title, descLabel }, Search = "" }
 	table.insert(self.Elements, entry)
 
-	-- API chung cho mọi thành phần dạng hàng (điều khiển bằng code)
 	local tab = self
 	local api = { Frame = row }
 	function api:SetTitle(v)
@@ -2552,7 +2463,6 @@ function Tab:_row(o, cfg)
 	return row, click, api
 end
 
--- Gắn các hàm API chung vào một object (không ghi đè hàm đã có)
 function Tab:_attach(obj, api)
 	for k, v in pairs(api) do
 		if obj[k] == nil then
@@ -2571,16 +2481,12 @@ function Tab:_removeElement(entry)
 	end
 end
 
--- Thêm thành phần theo tên (dùng khi dựng UI từ dữ liệu):  tab:Add("Toggle", {...})
 function Tab:Add(kind, opts)
 	local fn = self["Add" .. tostring(kind)]
 	assert(type(fn) == "function", "[LiquidGlass] Unknown element '" .. tostring(kind) .. "' (did you Library:Use its module?)")
 	return fn(self, opts or {})
 end
 
-------------------------------------------------------------------------
--- Tam giác (dùng clip một nửa hình thoi) + icon
-------------------------------------------------------------------------
 function Window:_triangle(parent, h, color)
 	local clip = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -2602,9 +2508,6 @@ function Window:_triangle(parent, h, color)
 	return clip, dia
 end
 
-------------------------------------------------------------------------
--- Mở rộng: cho module ngoài dùng chung tiện ích của library
-------------------------------------------------------------------------
 Library.Window, Library.Tab = Window, Tab
 Library.Util = {
 	new = new, tween = tween, dragX = dragX, isPress = isPress, isMove = isMove,
@@ -2613,9 +2516,6 @@ Library.Util = {
 	newSignal = newSignal, isDynamic = isDynamic,
 }
 
--- Nạp module chức năng:
---   Library:Use(require(Components.Toggle), require(Components.Slider))
---   Library:UseFolder(script.Parent.LiquidGlass.Components)   -- nạp cả thư mục
 function Library:Use(...)
 	for _, mod in ipairs({ ... }) do
 		if type(mod) == "function" then
@@ -2637,9 +2537,6 @@ function Library:UseFolder(folder)
 end
 
 
-------------------------------------------------------------------------
--- Thành phần dựng sẵn (gộp trong một file: dùng được cả executor lẫn Studio)
-------------------------------------------------------------------------
 do
 local function __lg_Section(Library)
 
@@ -2654,8 +2551,6 @@ local function __lg_Section(Library)
 		return self._group and self._group.Body or self.Page
 	end
 
-	-- Section = thẻ thu gọn được (giống mẫu): bấm tiêu đề để mở/đóng.
-	-- Mọi thành phần thêm sau đó (Button, Toggle, Slider, Dropdown, Text...) nằm trong thẻ này.
 	function Tab:AddSection(text, sopts)
 		local win = self.Window
 		sopts = type(sopts) == "table" and sopts or {}
@@ -2753,7 +2648,6 @@ local function __lg_Section(Library)
 				body.GroupTransparency = 1
 				body.Position = UDim2.fromOffset(0, -14)
 				tween(body, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.45, Enum.EasingStyle.Back)
-				-- các hàng bật lên lần lượt, giống lúc chuyển tab
 				local k = 0
 				for _, child in ipairs(body:GetChildren()) do
 					if child:IsA("GuiObject") then
@@ -2917,12 +2811,10 @@ local function __lg_Toggle(Library)
 			else
 				tween(track, tp, 0.25)
 				tween(knob, kp, 0.35, Enum.EasingStyle.Back)
-				-- knob giãn ra rồi co lại như giọt chất lỏng
 				tween(knob, { Size = UDim2.fromOffset(32, 24) }, 0.1)
 				task.delay(0.1, function()
 					tween(knob, { Size = UDim2.fromOffset(24, 24) }, 0.3, Enum.EasingStyle.Back)
 				end)
-				-- vòng sóng lan ra từ nút khi bật
 				if on then
 					local ring = new("Frame", {
 						AnchorPoint = Vector2.new(0.5, 0.5),
@@ -3081,7 +2973,6 @@ local function __lg_Dropdown(Library)
 		local _, click, api = self:_row(o, { Reserve = 190 })
 		local row = click.Parent
 
-		-- Options có thể là bảng, hoặc function trả về bảng (đọc lại mỗi lần mở)
 		local function getOptions()
 			if type(o.Options) == "function" then
 				local ok, r = pcall(o.Options)
@@ -3241,12 +3132,6 @@ local function __lg_Paragraph(Library)
 	local C = U.C
 	local Window, Tab = Library.Window, Library.Tab
 
-	------------------------------------------------------------------------
-	-- Tab: Paragraph — nội dung chạy theo code
-	--   Content: string | function() -> string | { "dòng 1", function() ... end, ... }
-	--   Title:   string | function() -> string
-	--   RefreshRate: số giây giữa mỗi lần cập nhật (mặc định opts.LiveRate = 0.25)
-	------------------------------------------------------------------------
 	function Tab:AddParagraph(o)
 		local t = type(o)
 		if t == "string" or t == "function" or (t == "table" and o.Content == nil and o.Title == nil and o[1] ~= nil) then
@@ -3311,7 +3196,6 @@ local function __lg_Paragraph(Library)
 		function obj:SetTitle(v)
 			titleBind:Set(v)
 		end
-		-- v: string | function | bảng nhiều dòng; rate (tuỳ chọn) = giây giữa mỗi lần cập nhật
 		function obj:SetContent(v, rate)
 			bodyBind:Set(v, rate)
 		end
@@ -3330,7 +3214,6 @@ local function __lg_Paragraph(Library)
 			tab:_removeElement(entry)
 			row:Destroy()
 		end
-		-- gán trực tiếp bằng code:  para.Content = "..." | function | bảng ;  para.Title = ... ;  para.Visible = false
 		return setmetatable({}, {
 			__index = function(_, key)
 				if key == "Content" then
@@ -3369,9 +3252,6 @@ local function __lg_Cards(Library)
 	local Window, Tab = Library.Window, Library.Tab
 	local TweenService = game:GetService("TweenService")
 
-	------------------------------------------------------------------------
-	-- Cards: Discord / YouTube / TikTok (admin tự điền thông tin)
-	------------------------------------------------------------------------
 	local PLATFORMS = {
 		Discord = { Color = C(88, 101, 242), Tag = "Discord Server" },
 		YouTube = { Color = C(255, 40, 40), Tag = "YouTube Channel" },
@@ -3435,7 +3315,6 @@ local function __lg_Cards(Library)
 		local cardStroke = win:_stroke(card, 1)
 		local cardScale = new("UIScale", { Parent = card })
 
-		-- ánh màu thương hiệu ở góc phải
 		local glow = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(1, -10, 0, 6),
@@ -3453,7 +3332,6 @@ local function __lg_Cards(Library)
 		glowTw:Play()
 		table.insert(win._loops, glowTw)
 
-		-- huy hiệu nền tảng
 		local badge = new("Frame", {
 			Position = UDim2.fromOffset(14, 14),
 			Size = UDim2.fromOffset(52, 52),
@@ -3511,7 +3389,6 @@ local function __lg_Cards(Library)
 		pulse:Play()
 		table.insert(win._loops, pulse)
 
-		-- chữ
 		local reserve = 92 + (o.Stat and 120 or 0)
 		local nameLbl = new("TextLabel", {
 			Position = UDim2.fromOffset(78, 14),
@@ -3573,7 +3450,6 @@ local function __lg_Cards(Library)
 			win:_text(chipText, o.Stat, o.RefreshRate)
 		end
 
-		-- ô link + nút copy
 		local box = new("TextBox", {
 			Position = UDim2.fromOffset(14, 88),
 			Size = UDim2.new(1, -118, 0, 26),
@@ -3644,7 +3520,6 @@ local function __lg_Cards(Library)
 			end
 		end)
 
-		-- hover
 		card.MouseEnter:Connect(function()
 			tween(cardScale, { Scale = 1.02 }, 0.25, Enum.EasingStyle.Back)
 			tween(cardStroke, { Color = brand, Transparency = 0.1 }, 0.2)
@@ -3654,7 +3529,6 @@ local function __lg_Cards(Library)
 			tween(cardStroke, { Color = win.Theme.Stroke, Transparency = win:_val("StrokeT") }, 0.25)
 		end)
 
-		-- vệt sáng quét qua card
 
 		table.insert(self.Elements, {
 			Frame = card,
@@ -3709,9 +3583,6 @@ local function __lg_Music(Library)
 		return lum > 0.72 and Color3.fromRGB(20, 20, 24) or Color3.new(1, 1, 1)
 	end
 
-	------------------------------------------------------------------------
-	-- Music
-	------------------------------------------------------------------------
 	local function parseAudioId(v)
 		if v == nil then
 			return nil
@@ -3832,7 +3703,6 @@ local function __lg_Music(Library)
 		m.Sound.Looped = on and true or false
 	end
 
-	-- Nhạc admin chạy theo code: bảng, hoặc function trả về bảng (đọc lại liên tục)
 	local function normTracks(win, src)
 		if type(src) == "function" then
 			local ok, r = pcall(src)
@@ -3920,7 +3790,6 @@ local function __lg_Music(Library)
 		return false
 	end
 
-	-- which: số thứ tự hoặc tên bài; bỏ trống = bài đang chọn
 	function Window:PlayAdmin(which)
 		local list = self:GetAdminTracks()
 		local idx = type(which) == "number" and which or nil
@@ -3942,7 +3811,6 @@ local function __lg_Music(Library)
 		return self:PlayMusic(tr.Id, tr.Name, "admin")
 	end
 
-	-- Gọi từ CreateWindow: tạo Window.Music (điều khiển nhạc bằng code) + tín hiệu AdminChanged
 	function Window:_initMusicCtl(opts)
 		local win = self
 		self._musicListeners = self._musicListeners or {}
@@ -3984,14 +3852,6 @@ local function __lg_Music(Library)
 		}
 	end
 
-	--[[
-		Tab:AddMusicPlayer({
-			AdminTracks = {...} | function,   -- tuỳ chọn: đặt nhạc admin
-			Volume = 0.5, Loop = true,
-			OnEmptyPlay = function() end,     -- khi bấm Play lúc chưa có nhạc (mặc định: phát bài admin đầu tiên)
-			OnStateChange = function(mm) end, -- mỗi khi trạng thái nhạc đổi (mm.Source = "admin" | "user" | nil)
-		})
-	]]
 	function Tab:AddMusicPlayer(o)
 		o = o or {}
 		local win = self.Window
@@ -4004,7 +3864,6 @@ local function __lg_Music(Library)
 		m.Sound.Volume = win.MusicVolume
 		m.Sound.Looped = o.Loop ~= false
 
-		-- Thẻ player
 		local card = new("Frame", {
 			Name = "MusicPlayer",
 			Size = UDim2.new(1, 0, 0, 142),
@@ -4134,7 +3993,6 @@ local function __lg_Music(Library)
 		})
 		win:_bind(tEnd, "TextColor3", "SubText")
 
-		-- nút play/pause + stop
 		local playBtn = new("TextButton", {
 			Position = UDim2.fromOffset(92, 98),
 			Size = UDim2.fromOffset(34, 34),
@@ -4203,7 +4061,6 @@ local function __lg_Music(Library)
 			end)
 		end
 
-		-- thanh visualizer
 		local N = 20
 		local viz = new("Frame", {
 			Position = UDim2.fromOffset(182, 100),
@@ -4224,7 +4081,6 @@ local function __lg_Music(Library)
 			vbars[i], smooth[i] = b, 0.08
 		end
 
-		-- màu theo theme
 		win:_hook(function()
 			local a = win.Theme.Accent
 			artGrad.Color = ColorSequence.new(a:Lerp(Color3.new(1, 1, 1), 0.2), a:Lerp(Color3.new(0, 0, 0), 0.4))
@@ -4289,7 +4145,6 @@ local function __lg_Music(Library)
 			tween(barKnob, { Size = active and UDim2.fromOffset(15, 15) or UDim2.fromOffset(10, 10) }, 0.15, Enum.EasingStyle.Back)
 		end)
 
-		-- visualizer phản ứng theo độ lớn âm thanh thật
 		local clock = 0
 		table.insert(win._conns, RunService.Heartbeat:Connect(function(dt)
 			if not card:IsDescendantOf(win.Gui) or not tab.Group.Visible or not win.Main.Visible then
@@ -4334,7 +4189,6 @@ __lg_Music(Library)
 end
 
 
--- Tab dựng sẵn (gọi khi cần): Window:AddSettingsTab / AddMusicTab / AddInfoTab
 do
 local function __lg_Presets(Library)
 
@@ -4344,9 +4198,6 @@ local function __lg_Presets(Library)
 	local LEFT, RIGHT, CENTER = U.LEFT, U.RIGHT, U.CENTER
 	local C = U.C
 	local Window, Tab = Library.Window, Library.Tab
-	------------------------------------------------------------------------
-	-- Tab Settings dựng sẵn (Interface)
-	------------------------------------------------------------------------
 	function Window:AddSettingsTab()
 		local tab = self:AddTab({ Title = "Settings" })
 		tab:AddSection("Interface")
@@ -4367,10 +4218,6 @@ local function __lg_Presets(Library)
 		})
 		return tab
 	end
-	------------------------------------------------------------------------
-	-- Tab Music dựng sẵn: ghép từ AddMusicPlayer + AddDropdown/AddToggle/AddInput/AddSlider
-	--   Nhạc admin (do admin đặt, đổi được bằng code) + nhạc người dùng (nhập ID là phát)
-	------------------------------------------------------------------------
 	function Window:AddMusicTab(o)
 		o = o or {}
 		local tab = self:AddTab({ Title = o.TabTitle or "Music" })
@@ -4428,7 +4275,7 @@ local function __lg_Presets(Library)
 		adminDrop = self:AddDropdown({
 			Title = "Admin Track",
 			Description = "Tracks chosen by the owner",
-			Options = names, -- đọc lại mỗi lần mở
+			Options = names,
 			Default = firstName(),
 			Callback = function(v)
 				for i, n in ipairs(names()) do
@@ -4464,7 +4311,6 @@ local function __lg_Presets(Library)
 				end
 			end,
 		})
-		-- admin đổi danh sách bằng code -> UI tự cập nhật
 		win.AdminChanged:Connect(function(list)
 			if adminIndex > #list then
 				adminIndex = math.max(#list, 1)
@@ -4509,7 +4355,6 @@ local function __lg_Presets(Library)
 		return win.Music
 	end
 
-	-- Tab "Info" dựng sẵn: admin điền thông tin nào thì hiện card đó
 	function Window:AddInfoTab(o)
 		o = o or {}
 		local tab = self:AddTab({ Title = o.Title or "Info" })
@@ -4541,20 +4386,6 @@ end
 __lg_Presets(Library)
 end
 
-------------------------------------------------------------------------
--- KeySystem kiểu LiquidGlass
--- Gọi TRƯỚC Library:CreateWindow. Hàm dừng (yield) tới khi nhập đúng key rồi trả về key.
---   local key = Library:RequireKey({
---       Title = "ThanhDuy Hub",
---       Note = "Nhập key để tiếp tục",
---       Key = "ABC-123",                             -- string hoặc bảng {"KEY1", "KEY2"}
---       KeyValidator = function(k) return true end,  -- tuỳ chọn, thay cho Key
---       URL = "https://...",                         -- tuỳ chọn, nút "Lấy key" (copy link)
---       SaveKey = true,                              -- lưu key đúng để lần sau bỏ qua
---       Folder = "ThanhDuyHub",                      -- thư mục lưu key
---       Theme = "ThanhDuy Violet",                   -- tuỳ chọn, dùng theme của thư viện
---   })
-------------------------------------------------------------------------
 function Library:RequireKey(opts)
 	opts = opts or {}
 	local theme = Themes[opts.Theme or ""] or Themes["ThanhDuy Violet"]
@@ -4584,7 +4415,6 @@ function Library:RequireKey(opts)
 		return opts.Key ~= nil and tostring(opts.Key) == key
 	end
 
-	-- Key đã lưu và còn đúng thì bỏ qua màn hình nhập
 	if saveKey then
 		local savedKey
 		pcall(function()
@@ -4613,7 +4443,6 @@ function Library:RequireKey(opts)
 		return tw
 	end
 
-	---------------------------------------------------------------- GUI
 	local gui = new("ScreenGui", {
 		Name = "ThanhDuyHub_KeySystem",
 		ResetOnSpawn = false,
@@ -4640,7 +4469,6 @@ function Library:RequireKey(opts)
 	})
 	local centerScale = new("UIScale", { Scale = 0.6, Parent = center })
 
-	-- Vòng lửa xoay quanh thẻ (nằm dưới thẻ)
 	local fireRing = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -4650,7 +4478,6 @@ function Library:RequireKey(opts)
 		Parent = center,
 	})
 
-	-- Sóng lửa nổ ra lúc intro
 	local burst = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -4662,7 +4489,6 @@ function Library:RequireKey(opts)
 	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = burst })
 	local burstStroke = new("UIStroke", { Color = FIRE[2], Thickness = 4, Parent = burst })
 
-	-- Các ngọn lửa xếp thành elip quanh thẻ
 	local flames = {}
 	local N = 22
 	local rx, ry = CW / 2 + 36, CH / 2 + 36
@@ -4694,7 +4520,6 @@ function Library:RequireKey(opts)
 		flames[i] = { f = flame, g = glow, x = px, y = py, s = size }
 	end
 
-	-- Thẻ kính
 	local card = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -4740,7 +4565,6 @@ function Library:RequireKey(opts)
 		Parent = sheen,
 	})
 
-	-- Icon: vòng lửa gradient
 	local iconCircle = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 24),
@@ -4803,7 +4627,6 @@ function Library:RequireKey(opts)
 		Parent = card,
 	})
 
-	-- Ô nhập key
 	local inputFrame = new("Frame", {
 		Position = UDim2.new(0, 20, 0, 170),
 		Size = UDim2.new(1, -40, 0, 44),
@@ -4904,7 +4727,6 @@ function Library:RequireKey(opts)
 		confirm = makeButton(UDim2.new(0, 20, 0, 248), UDim2.new(1, -40, 0, 44), "Xác nhận", true)
 	end
 
-	---------------------------------------------------------------- Logic
 	local busy, done, result = false, false, nil
 
 	local function setStatus(text, color)
@@ -4927,7 +4749,6 @@ function Library:RequireKey(opts)
 	end
 
 	local function close()
-		-- lửa bung ra ngoài rồi tan
 		for _, fl in ipairs(flames) do
 			local ox, oy = fl.x * 1.8, fl.y * 1.8
 			tween(fl.f, { Position = UDim2.new(0.5, ox, 0.5, oy), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1 }, 0.5)
@@ -4985,8 +4806,6 @@ function Library:RequireKey(opts)
 		end)
 	end
 
-	---------------------------------------------------------------- Intro
-	-- 1) Lửa từ tâm bắn ra thành vòng, sóng nổ mở rộng
 	for i, fl in ipairs(flames) do
 		task.delay(0.05 + i * 0.012, function()
 			tween(fl.f, {
@@ -5003,15 +4822,12 @@ function Library:RequireKey(opts)
 	tween(burst, { Size = UDim2.fromOffset(CW * 1.5, CW * 1.5) }, 0.9, Enum.EasingStyle.Quint)
 	tween(burstStroke, { Transparency = 1, Thickness = 1 }, 0.9)
 
-	-- 2) Thẻ hiện ra cùng dim và phóng lên
 	task.delay(0.35, function()
-		tween(dim, { BackgroundTransparency = 0.45 }, 0.35)
 		tween(centerScale, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
 		tween(card, { BackgroundTransparency = theme.WindowT }, 0.4)
 		tween(cardStroke, { Transparency = theme.StrokeT }, 0.4)
 	end)
 
-	-- 3) Tiêu đề gõ dần, vòng lửa xoay liên tục, ngọn lửa nhấp nháy
 	task.delay(0.6, function()
 		local n = utf8.len(title.Text) or #title.Text
 		title.MaxVisibleGraphemes = 0
@@ -29270,10 +29086,6 @@ return{
 	Library.IconsType = "lucide"
 end
 
-------------------------------------------------------------------------
--- Icon: tên lucide ("trending-up") hoặc "bộ:tên" ("solar:home"),
--- hoặc rbxassetid trực tiếp. Dùng cho Tab, Button, Toggle, ...
-------------------------------------------------------------------------
 function Library:GetIcon(name, setName)
 	if type(name) ~= "string" or name == "" then return nil end
 	if name:find("rbxasset") then return { Image = name } end
@@ -29308,21 +29120,13 @@ function Library:ApplyIcon(img, name, setName)
 	return true
 end
 
-------------------------------------------------------------------------
--- Button Section: thẻ thu gọn chứa nhiều nút
---   tab:AddButtonSection({
---       Title = "Auto Level", Description = "...", Open = true,
---       Buttons = { { Title = "Bắt đầu", Icon = "play", Callback = fn }, ... },
---   })
---   obj:AddButton({...}) thêm nút sau, obj:SetOpen(bool), obj:Destroy()
-------------------------------------------------------------------------
 function Tab:AddButtonSection(o)
 	o = o or {}
 	local tab = self
 	local prev = self._group
 	local sec = self:AddSection(o.Title or "Section", { Description = o.Description, Open = o.Open })
 	local group = self._group
-	self._group = prev -- phần tử sau đó không nằm trong section này
+	self._group = prev
 
 	local obj = { Section = sec, Buttons = {} }
 
@@ -29357,13 +29161,6 @@ function Tab:AddButtonSection(o)
 	return obj
 end
 
-------------------------------------------------------------------------
--- Tab Section: thanh tab con (pill, có icon) nằm trong một Tab
---   local ts = tab:AddTabSection()
---   local farm = ts:AddSubTab({ Title = "Level Farm", Icon = "trending-up", OnSelect = fn })
---   farm:AddToggle({...}) / farm:AddButtonSection({...}) / farm:AddButton({...})
---   ts:Select(farm)
-------------------------------------------------------------------------
 do
 local SubTabs = {}
 SubTabs.__index = SubTabs
@@ -29553,13 +29350,8 @@ function SubTabs:_refresh()
 	end
 end
 
-------------------------------------------------------------------------
 end
 
--- VÍ DỤ: Tab "Farm" có Tab Section (3 tab con) + Button Section + Toggle + icon
---   local win = Library:CreateWindow({ Title = "ThanhDuy Hub" })
---   Library:AddExampleFarmTab(win)
-------------------------------------------------------------------------
 function Library:AddExampleFarmTab(win)
 	local farm = win:AddTab({ Title = "Farm", Icon = "sprout" })
 	local ts = farm:AddTabSection()
