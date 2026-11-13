@@ -1010,7 +1010,7 @@ function Library:CreateWindow(opts)
 		sheen.Transparency = NumberSequence.new(0, self.Theme.Sheen)
 	end)
 
-	local liquid = new("CanvasGroup", {
+	local liquid = new("Frame", {
 		Name = "Liquid",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
@@ -1187,12 +1187,11 @@ function Library:CreateWindow(opts)
 		end
 	end, true)
 
-	local body = new("CanvasGroup", {
+	local body = new("Frame", {
 		Name = "Body",
 		Position = UDim2.fromOffset(0, 36),
 		Size = UDim2.new(1, 0, 1, -36),
 		BackgroundTransparency = 1,
-		GroupTransparency = 1,
 		Parent = main,
 	})
 	self.Body = body
@@ -1501,7 +1500,6 @@ function Library:CreateWindow(opts)
 	main.BackgroundTransparency = 1
 	tween(main, { BackgroundTransparency = wt }, 0.45)
 	task.delay(0.1, function()
-		tween(body, { GroupTransparency = 0 }, 0.5)
 		tween(side, { Position = UDim2.fromOffset(10, 4) }, 0.65, Enum.EasingStyle.Quint)
 		tween(content, { Position = UDim2.fromOffset(172, 0) }, 0.65, Enum.EasingStyle.Quint)
 	end)
@@ -1881,7 +1879,6 @@ function Window:Close()
 	self:_closePanel()
 	tween(self._uiScale, { Scale = self.Scale * 0.82 }, 0.32, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 	tween(self.Main, { BackgroundTransparency = 1 }, 0.3)
-	tween(self.Body, { GroupTransparency = 1 }, 0.22)
 	tween(self._float, { BackgroundTransparency = 1 }, 0.2)
 	if self._floatIcon then
 		tween(self._floatIcon, { ImageTransparency = 1 }, 0.2)
@@ -2168,9 +2165,8 @@ function Window:SelectTab(tab)
 			self:_sound("Tab")
 		end
 		tab.Group.Visible = true
-		tab.Group.GroupTransparency = 1
 		tab.Group.Position = UDim2.fromOffset(0, idx < prevIdx and -26 or 26)
-		tween(tab.Group, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.55, Enum.EasingStyle.Back)
+		tween(tab.Group, { Position = UDim2.fromOffset(0, 0) }, 0.55, Enum.EasingStyle.Back)
 		self._header.Text = tab.Title
 		self._header.TextTransparency = 1
 		self._header.Position = UDim2.fromOffset(4, 12)
@@ -2296,7 +2292,7 @@ function Window:AddTab(o)
 		tab._render(false)
 	end)
 
-	tab.Group = new("CanvasGroup", {
+	tab.Group = new("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -2626,12 +2622,11 @@ local function __lg_Section(Library)
 		local chev = win:_chevron(head)
 		chev.Rotation = open and 0 or -90
 
-		local body = new("CanvasGroup", {
+		local body = new("Frame", {
 			Name = "Body",
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
-			GroupTransparency = open and 0 or 1,
 			LayoutOrder = 2,
 			Visible = open,
 			Parent = card,
@@ -2652,9 +2647,8 @@ local function __lg_Section(Library)
 			tween(chev, { Rotation = self.Open and 0 or -90 }, 0.35, Enum.EasingStyle.Back)
 			if self.Open then
 				body.Visible = true
-				body.GroupTransparency = 1
 				body.Position = UDim2.fromOffset(0, -14)
-				tween(body, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.45, Enum.EasingStyle.Back)
+				tween(body, { Position = UDim2.fromOffset(0, 0) }, 0.45, Enum.EasingStyle.Back)
 				local k = 0
 				for _, child in ipairs(body:GetChildren()) do
 					if child:IsA("GuiObject") then
@@ -2679,7 +2673,7 @@ local function __lg_Section(Library)
 					end
 				end
 			else
-				tween(body, { GroupTransparency = 1, Position = UDim2.fromOffset(0, -10) }, 0.25)
+				tween(body, { Position = UDim2.fromOffset(0, -10) }, 0.25)
 				task.delay(0.26, function()
 					if self._tok == token and not self.Open then
 						body.Visible = false
@@ -3310,7 +3304,7 @@ local function __lg_Cards(Library)
 		local brand = o.Color or plat.Color
 		local url = buildUrl(platform, o)
 
-		local card = new("CanvasGroup", {
+		local card = new("Frame", {
 			Name = type(o.Name) == "string" and o.Name or plat.Tag,
 			Size = UDim2.new(1, 0, 0, 126),
 			LayoutOrder = #self.Elements + 1,
@@ -29301,13 +29295,12 @@ function SubTabs:AddSubTab(o)
 		IsSubTab = true,
 	}, Tab)
 
-	sub.Page = new("CanvasGroup", {
+	sub.Page = new("Frame", {
 		Name = sub.Title,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		Visible = false,
-		GroupTransparency = 1,
 		LayoutOrder = #self.Items + 1,
 		Parent = self.Content,
 	})
@@ -29390,11 +29383,9 @@ function SubTabs:Select(sub)
 	self:_refresh()
 	local page = sub.Page
 	if prev then
-		page.GroupTransparency = 1
 		page.Position = UDim2.fromOffset(0, ni > pi and 24 or -24)
-		tween(page, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.5, Enum.EasingStyle.Back)
+		tween(page, { Position = UDim2.fromOffset(0, 0) }, 0.5, Enum.EasingStyle.Back)
 	else
-		page.GroupTransparency = 0
 	end
 	if sub.OnSelect then
 		task.spawn(sub.OnSelect, sub)
@@ -29454,6 +29445,33 @@ function Library:AddExampleFarmTab(win)
 	fight:AddButton({ Title = "Tự động đánh", Icon = "swords", Callback = function() print("Auto fight") end })
 
 	return farm
+end
+
+function Library:AddExampleButtonTab(win)
+	local tab = win:AddTab({ Title = "Buttons", Icon = "mouse-pointer-click" })
+	tab:AddButtonSection({
+		Title = "Hành động nhanh",
+		Description = "Nhấn nút để chạy",
+		Open = true,
+		Buttons = {
+			{ Title = "Teleport", Icon = "map-pin", Callback = function() print("Teleport") end },
+			{ Title = "Reset", Icon = "rotate-ccw", Callback = function() print("Reset") end },
+		},
+	})
+	local settings = tab:AddButtonSection({
+		Title = "Cài đặt",
+		Description = "Mở để xem thêm nút",
+		Open = false,
+		Buttons = {
+			{ Title = "Bật tất cả", Callback = function() print("On all") end },
+		},
+	})
+	settings:AddButton({
+		Title = "Tắt tất cả",
+		Description = "Thêm nút sau khi tạo section",
+		Callback = function() print("Off all") end,
+	})
+	return tab
 end
 
 return Library
