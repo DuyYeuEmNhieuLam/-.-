@@ -616,30 +616,15 @@ function Window:SetRounded(on)
 end
 
 function Window:SetBlur(on, size)
-	self.BlurEnabled = on and true or false
-	self._blurSize = size or self._blurSize or 14
-	local show = self.BlurEnabled and self.Visible
-	if show then
-		if not self._blur then
-			self._blur = new("BlurEffect", { Name = "LiquidGlassBlur", Size = 0, Parent = Lighting })
-		end
-		tween(self._blur, { Size = self._blurSize }, 0.4)
-	elseif self._blur then
-		tween(self._blur, { Size = 0 }, 0.3)
+	-- Blur đã được tắt hoàn toàn: luôn giữ giao diện rõ, không làm mờ nền
+	self.BlurEnabled = false
+	if self._blur then
+		self._blur:Destroy()
+		self._blur = nil
 	end
-	-- Frost: thêm nhòe chiều sâu để ra cảm giác kính mờ dày như iOS 26
-	local frost = self.Theme.Frost or 0
-	if show and frost > 0 then
-		if not self._dof then
-			self._dof = new("DepthOfFieldEffect", {
-				Name = "LiquidGlassFrost",
-				FarIntensity = 0, NearIntensity = 0, FocusDistance = 0, InFocusRadius = 0,
-				Parent = Lighting,
-			})
-		end
-		tween(self._dof, { FarIntensity = frost }, 0.5)
-	elseif self._dof then
-		tween(self._dof, { FarIntensity = 0 }, 0.3)
+	if self._dof then
+		self._dof:Destroy()
+		self._dof = nil
 	end
 end
 
@@ -1034,6 +1019,26 @@ function Library:CreateWindow(opts)
 		end
 	end
 
+	-- Nền (background) phía sau cửa sổ kính: opts.Background, opts.BackgroundDim
+	self._bg = new("ImageLabel", {
+		Name = "Background",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Image = "",
+		ScaleType = Enum.ScaleType.Crop,
+		ZIndex = 0,
+		Parent = self.Gui,
+	})
+	self._bgDim = new("Frame", {
+		Name = "BackgroundDim",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C(0, 0, 0),
+		BackgroundTransparency = 1,
+		ZIndex = 0,
+		Parent = self.Gui,
+	})
+	self:SetBackground(opts.Background, opts.BackgroundDim)
+
 	-- Cửa sổ chính
 	local main = new("Frame", {
 		Name = "Main",
@@ -1226,10 +1231,14 @@ function Library:CreateWindow(opts)
 		self:_bar(b, UDim2.fromOffset(13, 2), UDim2.fromScale(0.5, 0.5), 45)
 		self:_bar(b, UDim2.fromOffset(13, 2), UDim2.fromScale(0.5, 0.5), -45)
 	end, function()
-		if opts.OnClose then
-			task.spawn(opts.OnClose)
+		if opts.ConfirmClose == false then
+			if opts.OnClose then
+				task.spawn(opts.OnClose)
+			end
+			self:Close()
+		else
+			self:AskClose(opts.OnClose)
 		end
-		self:Close()
 	end, true)
 
 	-- Thân cửa sổ
@@ -1484,22 +1493,45 @@ function Library:CreateWindow(opts)
 	new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2), Parent = plist })
 	self._panel, self._plist = panel, plist
 
-	-- Nút nổi
-	-- Nút nổi: hiện icon của game đang chơi
+	-- Nút mở UI: kính tròn, icon game ở giữa, viền accent phát sáng nhịp nhàng
 	local float = new("ImageButton", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -24, 0.4, 0),
-		Size = UDim2.fromOffset(52, 52),
-		Image = "rbxthumb://type=GameIcon&id=" .. tostring(game.GameId) .. "&w=150&h=150",
-		ScaleType = Enum.ScaleType.Crop,
+		Size = UDim2.fromOffset(60, 60),
+		BackgroundColor3 = C(255, 255, 255),
+		Image = "",
+		AutoButtonColor = false,
 		Visible = self.FloatingEnabled,
+		ZIndex = 20,
 		Parent = self.Gui,
 	})
 	self._float = float
 	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = float })
 	self:_bind(float, "BackgroundColor3", "Window")
 	self:_bind(float, "BackgroundTransparency", "WindowT")
-	local floatStroke = self:_stroke(float, 1.5)
+	self:_stroke(float, 1)
+
+	local floatIcon = new("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(44, 44),
+		BackgroundTransparency = 1,
+		Image = "rbxthumb://type=GameIcon&id=" .. tostring(game.GameId) .. "&w=150&h=150",
+		ScaleType = Enum.ScaleType.Crop,
+		ZIndex = 21,
+		Parent = float,
+	})
+	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = floatIcon })
+	self._floatIcon = floatIcon
+
+	local ring = new("UIStroke", {
+		Thickness = 2,
+		Transparency = 0.25,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Parent = float,
+	})
+	self:_bind(ring, "Color", "Accent")
+
 	self:_drag(float, float, function()
 		self:Toggle()
 	end)
@@ -1508,18 +1540,20 @@ function Library:CreateWindow(opts)
 		tween(fs, { Scale = 1 }, 0.5, Enum.EasingStyle.Back)
 	end)
 	float.MouseEnter:Connect(function()
-		tween(fs, { Scale = 1.12 }, 0.2, Enum.EasingStyle.Back)
+		tween(fs, { Scale = 1.1 }, 0.2, Enum.EasingStyle.Back)
+		tween(ring, { Transparency = 0 }, 0.2)
 	end)
 	float.MouseLeave:Connect(function()
 		tween(fs, { Scale = 1 }, 0.2)
+		tween(ring, { Transparency = 0.25 }, 0.2)
 	end)
 	float.MouseButton1Down:Connect(function()
 		tween(fs, { Scale = 0.88 }, 0.1)
 	end)
 	float.MouseButton1Up:Connect(function()
-		tween(fs, { Scale = 1.12 }, 0.2, Enum.EasingStyle.Back)
+		tween(fs, { Scale = 1.1 }, 0.2, Enum.EasingStyle.Back)
 	end)
-	loop(floatStroke, { Thickness = 3.2 }, 1.3, Enum.EasingStyle.Sine, true)
+	loop(ring, { Thickness = 3.5 }, 1.6, Enum.EasingStyle.Sine, true)
 
 	-- Phím tắt ẩn/hiện
 	self._keyConn = UserInputService.InputBegan:Connect(function(input, processed)
@@ -1562,12 +1596,6 @@ function Library:CreateWindow(opts)
 	-- khôi phục theme đã lưu
 	if self._saved.__Theme and Themes[self._saved.__Theme] then
 		self:SetTheme(self._saved.__Theme)
-	end
-	if opts.Blur == nil then
-		opts.Blur = self.ThemeName == "ThanhDuy Violet" or string.sub(self.ThemeName, 1, 12) == "Liquid Glass" or string.sub(self.ThemeName, 1, 6) == "iOS 26"
-	end
-	if opts.Blur then
-		self:SetBlur(true, opts.BlurSize or self.Theme.Blur)
 	end
 	if self._initMusicCtl then
 		self:_initMusicCtl(opts)
@@ -1664,6 +1692,203 @@ function Window:Destroy()
 	self.Gui:Destroy()
 end
 
+-- Nền:
+--   ảnh tĩnh: "rbxassetid://..." / số / URL
+--   ảnh động (GIF đã đổi thành spritesheet):
+--     { Sheet = id, Columns = 4, Rows = 7, FrameWidth = 256, FrameHeight = 144, Frames = 28, FPS = 12 }
+-- dim = độ tối lớp phủ (0 - 1)
+function Window:SetBackground(src, dim)
+	self._bgToken = (self._bgToken or 0) + 1
+	local token = self._bgToken
+	local bg = self._bg
+
+	local function asId(v)
+		if type(v) == "number" then
+			return "rbxassetid://" .. tostring(v)
+		end
+		if type(v) == "string" and v ~= "" then
+			return v:match("^%d+$") and ("rbxassetid://" .. v) or v
+		end
+		return ""
+	end
+
+	if type(src) == "table" then
+		local cols = math.max(tonumber(src.Columns) or 1, 1)
+		local rows = math.max(tonumber(src.Rows) or 1, 1)
+		local fw = tonumber(src.FrameWidth) or 256
+		local fh = tonumber(src.FrameHeight) or 144
+		local count = math.max(tonumber(src.Frames) or cols * rows, 1)
+		local fps = math.max(tonumber(src.FPS) or 12, 1)
+
+		bg.Image = asId(src.Sheet)
+		bg.ImageRectSize = Vector2.new(fw, fh)
+		bg.ImageRectOffset = Vector2.new(0, 0)
+
+		task.spawn(function()
+			local i = 0
+			while self._bgToken == token and bg.Parent do
+				bg.ImageRectOffset = Vector2.new((i % cols) * fw, math.floor(i / cols) * fh)
+				i = (i + 1) % count
+				task.wait(1 / fps)
+			end
+		end)
+	else
+		bg.Image = asId(src)
+		bg.ImageRectSize = Vector2.new(0, 0)
+		bg.ImageRectOffset = Vector2.new(0, 0)
+	end
+
+	local dimAmount = math.clamp(tonumber(dim) or 0.35, 0, 1)
+	tween(self._bgDim, { BackgroundTransparency = bg.Image ~= "" and (1 - dimAmount) or 1 }, 0.4)
+end
+
+-- Hộp xác nhận trước khi xoá UI (nút X). onConfirm chạy trước khi đóng.
+function Window:AskClose(onConfirm)
+	if self._askOpen or self._closing then
+		return
+	end
+	self._askOpen = true
+
+	local dim = new("TextButton", {
+		Name = "ConfirmDim",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C(0, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 60,
+		Parent = self.Gui,
+	})
+	tween(dim, { BackgroundTransparency = 0.45 }, 0.25)
+
+	local card = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(330, 200),
+		ZIndex = 61,
+		Parent = dim,
+	})
+	self:_bind(card, "BackgroundColor3", "Window")
+	self:_bind(card, "BackgroundTransparency", "WindowT")
+	self:_corner(card, 22)
+	self:_stroke(card, 1.5)
+	local cs = new("UIScale", { Scale = 0.85, Parent = card })
+	tween(cs, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
+
+	local badge = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 20),
+		Size = UDim2.fromOffset(52, 52),
+		BackgroundColor3 = C(235, 60, 60),
+		BackgroundTransparency = 0.8,
+		ZIndex = 62,
+		Parent = card,
+	})
+	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
+	new("TextLabel", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "!",
+		Font = FONT_BOLD,
+		TextSize = 26,
+		TextColor3 = C(235, 60, 60),
+		ZIndex = 63,
+		Parent = badge,
+	})
+
+	local title = new("TextLabel", {
+		Position = UDim2.new(0, 20, 0, 84),
+		Size = UDim2.new(1, -40, 0, 24),
+		BackgroundTransparency = 1,
+		Text = "Xoá giao diện?",
+		Font = FONT_BOLD,
+		TextSize = 18,
+		ZIndex = 62,
+		Parent = card,
+	})
+	self:_bind(title, "TextColor3", "Text")
+
+	local desc = new("TextLabel", {
+		Position = UDim2.new(0, 28, 0, 112),
+		Size = UDim2.new(1, -56, 0, 34),
+		BackgroundTransparency = 1,
+		Text = "Giao diện sẽ được đóng và xoá khỏi màn hình. Bạn có chắc chắn không?",
+		TextSize = 12,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		ZIndex = 62,
+		Parent = card,
+	})
+	self:_bind(desc, "TextColor3", "SubText")
+
+	local function dismiss(after)
+		tween(dim, { BackgroundTransparency = 1 }, 0.2)
+		tween(cs, { Scale = 0.9 }, 0.2)
+		task.delay(0.22, function()
+			if dim.Parent then
+				dim:Destroy()
+			end
+			self._askOpen = false
+			if after then
+				after()
+			end
+		end)
+	end
+
+	local function button(x, text, danger)
+		local b = new("TextButton", {
+			Position = UDim2.new(x, 14, 0, 152),
+			Size = UDim2.new(0.5, -22, 0, 36),
+			BackgroundColor3 = danger and C(235, 60, 60) or C(255, 255, 255),
+			BackgroundTransparency = danger and 0.1 or 0.9,
+			Text = "",
+			ZIndex = 62,
+			Parent = card,
+		})
+		new("UICorner", { CornerRadius = UDim.new(0, 12), Parent = b })
+		local lbl = new("TextLabel", {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Text = text,
+			Font = FONT_BOLD,
+			TextSize = 14,
+			TextColor3 = C(255, 255, 255),
+			ZIndex = 63,
+			Parent = b,
+		})
+		if not danger then
+			self:_bind(lbl, "TextColor3", "Text")
+		end
+		local base = b.BackgroundTransparency
+		b.MouseEnter:Connect(function()
+			tween(b, { BackgroundTransparency = math.max(base - 0.12, 0) }, 0.15)
+		end)
+		b.MouseLeave:Connect(function()
+			tween(b, { BackgroundTransparency = base }, 0.15)
+		end)
+		return b
+	end
+
+	local cancel = button(0, "Huỷ", false)
+	local ok = button(0.5, "Xoá UI", true)
+	cancel.Position = UDim2.new(0, 14, 0, 152)
+	ok.Position = UDim2.new(0.5, 8, 0, 152)
+	cancel.MouseButton1Click:Connect(function()
+		dismiss()
+	end)
+	dim.MouseButton1Click:Connect(function()
+		dismiss()
+	end)
+	ok.MouseButton1Click:Connect(function()
+		dismiss(function()
+			if onConfirm then
+				task.spawn(onConfirm)
+			end
+			self:Close()
+		end)
+	end)
+end
+
 -- Đóng có animation (nút X dùng hàm này); Destroy() vẫn đóng ngay lập tức
 function Window:Close()
 	if self._closing then
@@ -1675,6 +1900,9 @@ function Window:Close()
 	tween(self.Main, { BackgroundTransparency = 1 }, 0.3)
 	tween(self.Body, { GroupTransparency = 1 }, 0.22)
 	tween(self._float, { BackgroundTransparency = 1 }, 0.2)
+	if self._floatIcon then
+		tween(self._floatIcon, { ImageTransparency = 1 }, 0.2)
+	end
 	task.delay(0.36 / math.max(Library.AnimationSpeed or 1, 0.05), function()
 		self:Destroy()
 	end)
@@ -4040,57 +4268,6 @@ local function __lg_Presets(Library)
 	function Window:AddSettingsTab()
 		local tab = self:AddTab({ Title = "Settings" })
 		tab:AddSection("Interface")
-		tab:AddToggle({
-			Title = "Liquid Glass Blur",
-			Default = self.BlurEnabled,
-			Callback = function(v)
-				self:SetBlur(v)
-			end,
-		})
-		tab:AddToggle({
-			Title = "Acrylic Transparency",
-			Default = self.Acrylic,
-			Callback = function(v)
-				self:SetAcrylic(v)
-			end,
-		})
-		tab:AddDropdown({
-			Title = "Select Theme",
-			Description = "Choose the UI theme",
-			Options = Library:GetThemes(),
-			Default = self.ThemeName,
-			CloseOnSelect = false,
-			Callback = function(v)
-				self:SetTheme(v)
-			end,
-		})
-		tab:AddToggle({
-			Title = "Rounded Corners",
-			Description = "Round or square the UI corners",
-			Default = self.Rounded,
-			Callback = function(v)
-				self:SetRounded(v)
-			end,
-		})
-		tab:AddToggle({
-			Title = "Floating Button",
-			Description = "Round button to show / hide the menu",
-			Default = self.FloatingEnabled,
-			Callback = function(v)
-				self:SetFloatingButton(v)
-			end,
-		})
-		tab:AddSlider({
-			Title = "Blur Size",
-			Min = 0, Max = 40, Default = self._blurSize or 14,
-			Callback = function(v)
-				self._blurSize = v
-				self._blurUser = true
-				if self.BlurEnabled then
-					self:SetBlur(true, v)
-				end
-			end,
-		})
 		tab:AddSlider({
 			Title = "UI Scale",
 			Min = 0.7, Max = 1.3, Step = 0.05, Default = 1,
