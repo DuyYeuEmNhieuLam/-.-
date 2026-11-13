@@ -11,6 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Library = {}
 Library.__index = Library
 Library.Version = "1.2.0"
+Library.DefaultBackground = "81995438953887"
 Library.AnimationSpeed = 1
 
 local Window = {}
@@ -978,7 +979,11 @@ function Library:CreateWindow(opts)
 		ZIndex = 0,
 		Parent = self.Gui,
 	})
-	self:SetBackground(opts.Background, opts.BackgroundDim)
+	local bgSrc = opts.Background
+	if bgSrc == nil then
+		bgSrc = Library.DefaultBackground
+	end
+	self:SetBackground(bgSrc, opts.BackgroundDim)
 
 	local main = new("Frame", {
 		Name = "Main",
@@ -4398,6 +4403,22 @@ function Library:RequireKey(opts)
 	local keyFile = folder .. "/" .. uid .. ".key"
 	local canFile = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 	local saveKey = canFile and opts.SaveKey ~= false
+	local duration = tonumber(opts.KeyDuration)
+	local expiredAtStart = false
+	local resultExpires = nil
+
+	local function fmtLeft(sec)
+		sec = math.max(math.floor(sec), 0)
+		local d = math.floor(sec / 86400)
+		local h = math.floor((sec % 86400) / 3600)
+		local m = math.floor((sec % 3600) / 60)
+		if d > 0 then
+			return d .. "d " .. h .. "h"
+		elseif h > 0 then
+			return h .. "h " .. m .. "m"
+		end
+		return m .. "m"
+	end
 
 	local function clean(s)
 		return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
@@ -4416,20 +4437,33 @@ function Library:RequireKey(opts)
 	end
 
 	if saveKey then
-		local savedKey
+		local savedKey, savedStart
 		pcall(function()
 			if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder(folder) then
 				makefolder(folder)
 			end
 			if isfile(keyFile) then
-				local saved = clean(readfile(keyFile))
-				if check(saved) then
-					savedKey = saved
+				local raw = clean(readfile(keyFile))
+				local k, st = raw:match("^(.-)|(%d+)$")
+				if not k then
+					k = raw
+				end
+				if check(clean(k)) then
+					savedKey = clean(k)
+					savedStart = tonumber(st)
 				end
 			end
 		end)
 		if savedKey then
-			return savedKey
+			if duration and savedStart then
+				local left = duration - (os.time() - savedStart)
+				if left > 0 then
+					return savedKey, savedStart + duration
+				end
+				expiredAtStart = true
+			else
+				return savedKey, nil
+			end
 		end
 	end
 
@@ -4734,6 +4768,10 @@ function Library:RequireKey(opts)
 		status.TextColor3 = color or theme.SubText
 	end
 
+	if expiredAtStart then
+		setStatus("Key đã hết hạn, vui lòng nhập key mới", ERROR_C)
+	end
+
 	local function shake()
 		local base = card.Position
 		for _, off in ipairs({ 10, -10, 6, -6, 0 }) do
@@ -4769,11 +4807,19 @@ function Library:RequireKey(opts)
 		busy = true
 		local key = clean(input.Text)
 		if check(key) then
+			local start = os.time()
 			done, result = true, key
-			if saveKey then
-				pcall(writefile, keyFile, key)
+			if duration then
+				resultExpires = start + duration
 			end
-			setStatus("Xác thực thành công", OK_C)
+			if saveKey then
+				pcall(writefile, keyFile, duration and (key .. "|" .. tostring(start)) or key)
+			end
+			if duration then
+				setStatus("Xác thực thành công · còn " .. fmtLeft(duration), OK_C)
+			else
+				setStatus("Xác thực thành công", OK_C)
+			end
 			flashInput(OK_C)
 			close()
 		else
@@ -4857,7 +4903,27 @@ function Library:RequireKey(opts)
 		task.wait()
 	until done
 
-	return result
+	return result, resultExpires
+end
+
+function Library:Example()
+	local key = Library:RequireKey({
+		Title = "ThanhDuy Hub",
+		Note = "Nhập key để tiếp tục sử dụng",
+		Key = "ABC-123",
+		URL = "https://example.com/getkey",
+		KeyDuration = 24 * 60 * 60,
+		SaveKey = true,
+		Folder = "ThanhDuyHub",
+	})
+	local win = Library:CreateWindow({
+		Title = "ThanhDuy Hub",
+		Background = Library.DefaultBackground,
+		BackgroundDim = 0,
+		OnClose = function() end,
+	})
+	Library:AddExampleFarmTab(win)
+	return win, key
 end
 
 do
