@@ -11,7 +11,6 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Library = {}
 Library.__index = Library
 Library.Version = "1.2.0"
-Library.DefaultBackground = "81995438953887"
 Library.AnimationSpeed = 1
 
 local Window = {}
@@ -977,11 +976,7 @@ function Library:CreateWindow(opts)
 		BackgroundTransparency = 1,
 		ZIndex = 0,
 	})
-	local bgSrc = opts.Background
-	if bgSrc == nil then
-		bgSrc = Library.DefaultBackground
-	end
-	self:SetBackground(bgSrc, opts.BackgroundDim)
+	self:SetBackground(opts.Background, opts.BackgroundDim)
 
 	local main = new("Frame", {
 		Name = "Main",
@@ -1089,7 +1084,7 @@ function Library:CreateWindow(opts)
 		BackgroundTransparency = 1,
 		Font = FONT_BOLD,
 		TextSize = 12,
-		Text = "ThanhDuyHub",
+		Text = opts.Title or "ThanhDuyHub",
 		Parent = titleHolder,
 	})
 	self:_bind(titleLbl, "TextColor3", "Text")
@@ -4914,7 +4909,8 @@ function Library:Example()
 	})
 	local win = Library:CreateWindow({
 		Title = "ThanhDuy Hub",
-		Background = Library.DefaultBackground,
+		SubTitle = "Liquid Glass UI",
+		Background = "81995438953887",
 		BackgroundDim = 0,
 		OnClose = function() end,
 	})
@@ -29472,6 +29468,11 @@ function Library:AddExampleButtonTab(win)
 		Callback = function() print("Off all") end,
 	})
 	return tab
+end
+
+function Library:AddExampleBackground(win)
+	win:SetBackground("81995438953887", 0.2)
+	return win
 end
 
 return Library
