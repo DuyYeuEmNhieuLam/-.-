@@ -1050,6 +1050,9 @@ function Library:CreateWindow(opts)
 	self.Main = main
 	self._uiScale = new("UIScale", { Scale = 0.8, Parent = main })
 	tween(self._uiScale, { Scale = 1 }, 0.8, Enum.EasingStyle.Elastic)
+	task.delay(0.35, function()
+		self:_flash()
+	end)
 	self:_bind(main, "BackgroundColor3", "Window")
 	self:_bind(main, "BackgroundTransparency", "WindowT")
 	self:_corner(main, 24)
@@ -1606,6 +1609,45 @@ end
 ------------------------------------------------------------------------
 -- Window: điều khiển
 ------------------------------------------------------------------------
+-- Hiệu ứng sáng khi mở UI: lớp sáng quét ngang qua cửa sổ + viền sáng loé lên
+function Window:_flash()
+	if not self.Main or not self.Main.Parent then
+		return
+	end
+	local glow = new("Frame", {
+		Name = "OpenFlash",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C(255, 255, 255),
+		BackgroundTransparency = 0.7,
+		ZIndex = 50,
+		Parent = self.Main,
+	})
+	new("UICorner", { CornerRadius = UDim.new(0, 24 * (self.Theme.R or 1)), Parent = glow })
+	local sweep = new("UIGradient", {
+		Rotation = 20,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 0.15),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+		Offset = Vector2.new(-1, 0),
+		Parent = glow,
+	})
+	tween(sweep, { Offset = Vector2.new(1, 0) }, 0.9, Enum.EasingStyle.Sine)
+	tween(glow, { BackgroundTransparency = 1 }, 1.0)
+	local stroke = self.Main:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		local old = stroke.Transparency
+		stroke.Transparency = 0
+		tween(stroke, { Transparency = old }, 0.9)
+	end
+	task.delay(1.1, function()
+		if glow.Parent then
+			glow:Destroy()
+		end
+	end)
+end
+
 function Window:Toggle(v)
 	if v == nil then
 		v = not self.Visible
@@ -1616,6 +1658,7 @@ function Window:Toggle(v)
 		self.Main.Visible = true
 		self._uiScale.Scale = self.Scale * 0.92
 		tween(self._uiScale, { Scale = self.Scale }, 0.25, Enum.EasingStyle.Back)
+		self:_flash()
 	else
 		self:_closePanel()
 		tween(self._uiScale, { Scale = self.Scale * 0.92 }, 0.15)
