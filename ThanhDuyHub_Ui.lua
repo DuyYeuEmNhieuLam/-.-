@@ -2681,11 +2681,12 @@ local function __lg_Section(Library)
 		local chev = win:_chevron(head)
 		chev.Rotation = open and 0 or -90
 
-		local body = new("Frame", {
+		local body = new("CanvasGroup", {
 			Name = "Body",
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
+			GroupTransparency = open and 0 or 1,
 			LayoutOrder = 2,
 			Visible = open,
 			Parent = card,
@@ -2701,8 +2702,46 @@ local function __lg_Section(Library)
 		local group = { Body = body, Card = card, Open = open }
 		function group:SetOpen(v)
 			self.Open = v and true or false
-			body.Visible = self.Open
-			tween(chev, { Rotation = self.Open and 0 or -90 }, 0.3)
+			local token = {}
+			self._tok = token
+			tween(chev, { Rotation = self.Open and 0 or -90 }, 0.35, Enum.EasingStyle.Back)
+			if self.Open then
+				body.Visible = true
+				body.GroupTransparency = 1
+				body.Position = UDim2.fromOffset(0, -14)
+				tween(body, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.45, Enum.EasingStyle.Back)
+				-- các hàng bật lên lần lượt, giống lúc chuyển tab
+				local k = 0
+				for _, child in ipairs(body:GetChildren()) do
+					if child:IsA("GuiObject") then
+						k = k + 1
+						local sc = child:FindFirstChildOfClass("UIScale")
+						local own = sc == nil
+						if own then
+							sc = new("UIScale", { Scale = 0.86, Parent = child })
+						else
+							sc.Scale = 0.86
+						end
+						task.delay(math.min(k, 12) * 0.045, function()
+							tween(sc, { Scale = 1 }, 0.5, Enum.EasingStyle.Back)
+							if own then
+								task.delay(0.6, function()
+									if sc.Parent then
+										sc:Destroy()
+									end
+								end)
+							end
+						end)
+					end
+				end
+			else
+				tween(body, { GroupTransparency = 1, Position = UDim2.fromOffset(0, -10) }, 0.25)
+				task.delay(0.26, function()
+					if self._tok == token and not self.Open then
+						body.Visible = false
+					end
+				end)
+			end
 		end
 		head.MouseButton1Click:Connect(function()
 			group:SetOpen(not group.Open)
@@ -4479,6 +4518,7 @@ function Library:RequireKey(opts)
 	local R = theme.R or 1
 	local ERROR_C = C(255, 96, 112)
 	local OK_C = C(90, 220, 150)
+	local FIRE = { C(255, 60, 20), C(255, 120, 30), C(255, 180, 50), C(255, 235, 140) }
 	local folder = opts.Folder or "ThanhDuyHub"
 	local uid = tostring(Players.LocalPlayer and Players.LocalPlayer.UserId or "default")
 	local keyFile = folder .. "/" .. uid .. ".key"
@@ -4520,7 +4560,17 @@ function Library:RequireKey(opts)
 		end
 	end
 
-	-- Giao diện
+	local function rtween(inst, props, t, style, dir, repeatCount, reverses)
+		local tw = TweenService:Create(
+			inst,
+			TweenInfo.new(t, style or Enum.EasingStyle.Sine, dir or Enum.EasingDirection.InOut, repeatCount or 0, reverses or false),
+			props
+		)
+		tw:Play()
+		return tw
+	end
+
+	---------------------------------------------------------------- GUI
 	local gui = new("ScreenGui", {
 		Name = "ThanhDuyHub_KeySystem",
 		ResetOnSpawn = false,
@@ -4537,19 +4587,82 @@ function Library:RequireKey(opts)
 		Parent = gui,
 	})
 
+	local CW, CH = 340, 320
+	local center = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(CW, CH),
+		BackgroundTransparency = 1,
+		Parent = dim,
+	})
+	local centerScale = new("UIScale", { Scale = 0.6, Parent = center })
+
+	-- Vòng lửa xoay quanh thẻ (nằm dưới thẻ)
+	local fireRing = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(CW + 120, CH + 120),
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		Parent = center,
+	})
+
+	-- Sóng lửa nổ ra lúc intro
+	local burst = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(40, 40),
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		Parent = fireRing,
+	})
+	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = burst })
+	local burstStroke = new("UIStroke", { Color = FIRE[2], Thickness = 4, Parent = burst })
+
+	-- Các ngọn lửa xếp thành elip quanh thẻ
+	local flames = {}
+	local N = 22
+	local rx, ry = CW / 2 + 36, CH / 2 + 36
+	for i = 1, N do
+		local ang = (i - 1) / N * math.pi * 2
+		local px, py = math.cos(ang) * rx, math.sin(ang) * ry
+		local size = math.random(12, 20)
+		local col = FIRE[(i % #FIRE) + 1]
+		local glow = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(0, 0),
+			BackgroundColor3 = col,
+			BackgroundTransparency = 1,
+			ZIndex = 1,
+			Parent = fireRing,
+		})
+		new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = glow })
+		local flame = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(0, 0),
+			BackgroundColor3 = col,
+			BackgroundTransparency = 0.1,
+			ZIndex = 2,
+			Parent = fireRing,
+		})
+		new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = flame })
+		flames[i] = { f = flame, g = glow, x = px, y = py, s = size }
+	end
+
+	-- Thẻ kính
 	local card = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(340, 320),
+		Size = UDim2.fromOffset(CW, CH),
 		BackgroundColor3 = theme.Window,
 		BackgroundTransparency = 1,
-		ZIndex = 2,
-		Parent = dim,
+		ZIndex = 3,
+		Parent = center,
 	})
 	new("UICorner", { CornerRadius = UDim.new(0, 24 * R), Parent = card })
-	local cardScale = new("UIScale", { Scale = 0.88, Parent = card })
 
-	-- Viền kính sáng hai góc (cùng kiểu với các cửa sổ khác)
 	local cardStroke = new("UIStroke", {
 		Color = theme.Stroke,
 		Transparency = 1,
@@ -4567,12 +4680,11 @@ function Library:RequireKey(opts)
 		Parent = cardStroke,
 	})
 
-	-- Lớp phản sáng phía trên
 	local sheen = new("Frame", {
 		Size = UDim2.new(1, 0, 0.5, 0),
 		BackgroundColor3 = C(255, 255, 255),
 		BackgroundTransparency = 1 - (theme.Sheen or 0.2) * 0.4,
-		ZIndex = 2,
+		ZIndex = 3,
 		Parent = card,
 	})
 	new("UICorner", { CornerRadius = UDim.new(0, 24 * R), Parent = sheen })
@@ -4585,32 +4697,40 @@ function Library:RequireKey(opts)
 		Parent = sheen,
 	})
 
-	-- Icon tròn
+	-- Icon: vòng lửa gradient
 	local iconCircle = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 24),
 		Size = UDim2.fromOffset(60, 60),
-		BackgroundColor3 = theme.Accent,
-		BackgroundTransparency = 0.75,
-		ZIndex = 3,
+		BackgroundColor3 = FIRE[2],
+		BackgroundTransparency = 0.8,
+		ZIndex = 4,
 		Parent = card,
 	})
 	new("UICorner", { CornerRadius = UDim.new(1, 0), Parent = iconCircle })
 	local iconStroke = new("UIStroke", {
-		Color = theme.Accent,
-		Transparency = 0.4,
-		Thickness = 1,
+		Color = C(255, 255, 255),
+		Transparency = 0.2,
+		Thickness = 1.5,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		Parent = iconCircle,
 	})
-	new("TextLabel", {
+	new("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, FIRE[1]),
+			ColorSequenceKeypoint.new(1, FIRE[3]),
+		}),
+		Rotation = 90,
+		Parent = iconStroke,
+	})
+	local iconText = new("TextLabel", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		Text = "KEY",
 		Font = FONT_BOLD,
 		TextSize = 14,
-		TextColor3 = theme.Accent,
-		ZIndex = 4,
+		TextColor3 = FIRE[3],
+		ZIndex = 5,
 		Parent = iconCircle,
 	})
 
@@ -4622,11 +4742,11 @@ function Library:RequireKey(opts)
 		Font = FONT_BOLD,
 		TextSize = 20,
 		TextColor3 = theme.Text,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = card,
 	})
 
-	new("TextLabel", {
+	local note = new("TextLabel", {
 		Position = UDim2.new(0, 24, 0, 124),
 		Size = UDim2.new(1, -48, 0, 36),
 		BackgroundTransparency = 1,
@@ -4636,17 +4756,17 @@ function Library:RequireKey(opts)
 		TextColor3 = theme.SubText,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = card,
 	})
 
-	-- Ô nhập key kính mờ
+	-- Ô nhập key
 	local inputFrame = new("Frame", {
 		Position = UDim2.new(0, 20, 0, 170),
 		Size = UDim2.new(1, -40, 0, 44),
 		BackgroundColor3 = theme.Surface,
 		BackgroundTransparency = theme.SurfaceT,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = card,
 	})
 	new("UICorner", { CornerRadius = UDim.new(0, 12 * R), Parent = inputFrame })
@@ -4670,7 +4790,7 @@ function Library:RequireKey(opts)
 		TextSize = 14,
 		TextColor3 = theme.Text,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 4,
+		ZIndex = 5,
 		Parent = inputFrame,
 	})
 
@@ -4682,7 +4802,7 @@ function Library:RequireKey(opts)
 		Font = FONT,
 		TextSize = 12,
 		TextColor3 = theme.SubText,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = card,
 	})
 
@@ -4690,10 +4810,10 @@ function Library:RequireKey(opts)
 		local b = new("TextButton", {
 			Position = pos,
 			Size = size,
-			BackgroundColor3 = filled and theme.Accent or theme.Surface,
+			BackgroundColor3 = filled and FIRE[2] or theme.Surface,
 			BackgroundTransparency = filled and 0 or theme.SurfaceT,
 			Text = "",
-			ZIndex = 3,
+			ZIndex = 4,
 			Parent = card,
 		})
 		new("UICorner", { CornerRadius = UDim.new(0, 12 * R), Parent = b })
@@ -4713,21 +4833,27 @@ function Library:RequireKey(opts)
 			Font = FONT_BOLD,
 			TextSize = 14,
 			TextColor3 = filled and C(255, 255, 255) or theme.Text,
-			ZIndex = 4,
+			ZIndex = 5,
 			Parent = b,
 		})
 		local base = b.BackgroundTransparency
+		local baseSize = b.Size
 		b.MouseEnter:Connect(function()
 			tween(b, { BackgroundTransparency = math.max(base - 0.12, 0) }, 0.15)
 		end)
 		b.MouseLeave:Connect(function()
 			tween(b, { BackgroundTransparency = base }, 0.15)
 		end)
+		b.MouseButton1Down:Connect(function()
+			tween(b, { Size = UDim2.new(baseSize.X.Scale, baseSize.X.Offset - 4, baseSize.Y.Scale, baseSize.Y.Offset - 2) }, 0.08)
+		end)
+		b.MouseButton1Up:Connect(function()
+			tween(b, { Size = baseSize }, 0.2, Enum.EasingStyle.Back)
+		end)
 		return b
 	end
 
-	local getKey
-	local confirm
+	local getKey, confirm
 	if opts.URL then
 		getKey = makeButton(UDim2.new(0, 20, 0, 248), UDim2.new(0.5, -26, 0, 44), "Lấy key", false)
 		confirm = makeButton(UDim2.new(0.5, 6, 0, 248), UDim2.new(0.5, -26, 0, 44), "Xác nhận", true)
@@ -4735,7 +4861,7 @@ function Library:RequireKey(opts)
 		confirm = makeButton(UDim2.new(0, 20, 0, 248), UDim2.new(1, -40, 0, 44), "Xác nhận", true)
 	end
 
-	-- Logic
+	---------------------------------------------------------------- Logic
 	local busy, done, result = false, false, nil
 
 	local function setStatus(text, color)
@@ -4751,12 +4877,25 @@ function Library:RequireKey(opts)
 		end
 	end
 
+	local function flashInput(color)
+		inputStroke.Color = color
+		inputStroke.Transparency = 0
+		tween(inputStroke, { Color = theme.Stroke, Transparency = theme.StrokeT }, 0.6)
+	end
+
 	local function close()
-		tween(dim, { BackgroundTransparency = 1 }, 0.3)
+		-- lửa bung ra ngoài rồi tan
+		for _, fl in ipairs(flames) do
+			local ox, oy = fl.x * 1.8, fl.y * 1.8
+			tween(fl.f, { Position = UDim2.new(0.5, ox, 0.5, oy), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1 }, 0.5)
+			tween(fl.g, { Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1 }, 0.5)
+		end
+		tween(burstStroke, { Transparency = 1 }, 0.4)
+		tween(dim, { BackgroundTransparency = 1 }, 0.4)
 		tween(card, { BackgroundTransparency = 1 }, 0.3)
 		tween(cardStroke, { Transparency = 1 }, 0.3)
-		tween(cardScale, { Scale = 0.9 }, 0.3)
-		task.delay(0.35, function()
+		tween(centerScale, { Scale = 1.15 }, 0.4, Enum.EasingStyle.Quint)
+		task.delay(0.45, function()
 			gui:Destroy()
 		end)
 	end
@@ -4771,9 +4910,11 @@ function Library:RequireKey(opts)
 				pcall(writefile, keyFile, key)
 			end
 			setStatus("Xác thực thành công", OK_C)
+			flashInput(OK_C)
 			close()
 		else
 			setStatus("Key không đúng, thử lại", ERROR_C)
+			flashInput(ERROR_C)
 			task.spawn(shake)
 			busy = false
 		end
@@ -4781,27 +4922,77 @@ function Library:RequireKey(opts)
 
 	confirm.MouseButton1Click:Connect(verify)
 	input.FocusLost:Connect(function(enterPressed)
+		tween(inputStroke, { Color = theme.Stroke, Transparency = theme.StrokeT }, 0.2)
 		if enterPressed then
 			verify()
 		end
+	end)
+	input.Focused:Connect(function()
+		tween(inputStroke, { Color = FIRE[2], Transparency = 0.1 }, 0.2)
 	end)
 
 	if getKey then
 		getKey.MouseButton1Click:Connect(function()
 			if type(setclipboard) == "function" then
 				pcall(setclipboard, opts.URL)
-				setStatus("Đã copy link lấy key", theme.Accent)
+				setStatus("Đã copy link lấy key", FIRE[3])
 			else
-				setStatus(opts.URL, theme.Accent)
+				setStatus(opts.URL, FIRE[3])
 			end
 		end)
 	end
 
-	-- Hiệu ứng mở
-	tween(dim, { BackgroundTransparency = 0.45 }, 0.35)
-	tween(card, { BackgroundTransparency = theme.WindowT }, 0.35)
-	tween(cardStroke, { Transparency = theme.StrokeT }, 0.35)
-	tween(cardScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
+	---------------------------------------------------------------- Intro
+	-- 1) Lửa từ tâm bắn ra thành vòng, sóng nổ mở rộng
+	for i, fl in ipairs(flames) do
+		task.delay(0.05 + i * 0.012, function()
+			tween(fl.f, {
+				Position = UDim2.new(0.5, fl.x, 0.5, fl.y),
+				Size = UDim2.fromOffset(fl.s, fl.s),
+			}, 0.7, Enum.EasingStyle.Back)
+			tween(fl.g, {
+				Position = UDim2.new(0.5, fl.x, 0.5, fl.y),
+				Size = UDim2.fromOffset(fl.s * 2.4, fl.s * 2.4),
+				BackgroundTransparency = 0.82,
+			}, 0.7, Enum.EasingStyle.Back)
+		end)
+	end
+	tween(burst, { Size = UDim2.fromOffset(CW * 1.5, CW * 1.5) }, 0.9, Enum.EasingStyle.Quint)
+	tween(burstStroke, { Transparency = 1, Thickness = 1 }, 0.9)
+
+	-- 2) Thẻ hiện ra cùng dim và phóng lên
+	task.delay(0.35, function()
+		tween(dim, { BackgroundTransparency = 0.45 }, 0.35)
+		tween(centerScale, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
+		tween(card, { BackgroundTransparency = theme.WindowT }, 0.4)
+		tween(cardStroke, { Transparency = theme.StrokeT }, 0.4)
+	end)
+
+	-- 3) Tiêu đề gõ dần, vòng lửa xoay liên tục, ngọn lửa nhấp nháy
+	task.delay(0.6, function()
+		local n = utf8.len(title.Text) or #title.Text
+		title.MaxVisibleGraphemes = 0
+		for i = 0, n do
+			if done then break end
+			title.MaxVisibleGraphemes = i
+			task.wait(0.03)
+		end
+		title.MaxVisibleGraphemes = -1
+	end)
+
+	rtween(fireRing, { Rotation = 360 }, 7, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1, false)
+	for i, fl in ipairs(flames) do
+		task.delay(0.9 + i * 0.02, function()
+			rtween(fl.f, {
+				Size = UDim2.fromOffset(fl.s * 1.35, fl.s * 1.35),
+				BackgroundTransparency = 0,
+			}, 0.25 + math.random() * 0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+			rtween(fl.g, {
+				Size = UDim2.fromOffset(fl.s * 2.9, fl.s * 2.9),
+			}, 0.35 + math.random() * 0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+		end)
+	end
+	rtween(iconStroke, { Transparency = 0.6 }, 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
 
 	repeat
 		task.wait()
@@ -29202,12 +29393,13 @@ function SubTabs:AddSubTab(o)
 		IsSubTab = true,
 	}, Tab)
 
-	sub.Page = new("Frame", {
+	sub.Page = new("CanvasGroup", {
 		Name = sub.Title,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		Visible = false,
+		GroupTransparency = 1,
 		LayoutOrder = #self.Items + 1,
 		Parent = self.Content,
 	})
@@ -29277,8 +29469,25 @@ function SubTabs:AddSubTab(o)
 end
 
 function SubTabs:Select(sub)
+	local prev = self.Active
+	if prev == sub then
+		return
+	end
+	local pi, ni = 0, 0
+	for i, it in ipairs(self.Items) do
+		if it.sub == prev then pi = i end
+		if it.sub == sub then ni = i end
+	end
 	self.Active = sub
 	self:_refresh()
+	local page = sub.Page
+	if prev then
+		page.GroupTransparency = 1
+		page.Position = UDim2.fromOffset(0, ni > pi and 24 or -24)
+		tween(page, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }, 0.5, Enum.EasingStyle.Back)
+	else
+		page.GroupTransparency = 0
+	end
 	if sub.OnSelect then
 		task.spawn(sub.OnSelect, sub)
 	end
