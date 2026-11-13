@@ -969,7 +969,6 @@ function Library:CreateWindow(opts)
 		Image = "",
 		ScaleType = Enum.ScaleType.Crop,
 		ZIndex = 0,
-		Parent = self.Gui,
 	})
 	self._bgDim = new("Frame", {
 		Name = "BackgroundDim",
@@ -977,7 +976,6 @@ function Library:CreateWindow(opts)
 		BackgroundColor3 = C(0, 0, 0),
 		BackgroundTransparency = 1,
 		ZIndex = 0,
-		Parent = self.Gui,
 	})
 	local bgSrc = opts.Background
 	if bgSrc == nil then
@@ -993,6 +991,10 @@ function Library:CreateWindow(opts)
 		Parent = self.Gui,
 	})
 	self.Main = main
+	self._bg.Parent = main
+	self._bgDim.Parent = main
+	new("UICorner", { CornerRadius = UDim.new(0, 24 * (self.Theme.R or 1)), Parent = self._bg })
+	new("UICorner", { CornerRadius = UDim.new(0, 24 * (self.Theme.R or 1)), Parent = self._bgDim })
 	self._uiScale = new("UIScale", { Scale = 0.8, Parent = main })
 	tween(self._uiScale, { Scale = 1 }, 0.8, Enum.EasingStyle.Elastic)
 	self:_flash()
